@@ -1,22 +1,30 @@
 // Three buttons doing some things. 
-// Debra Lemak 10/14/17
-// Update      02/13/18
-// Wilkinson   03/09/18
+// Debra Lemak    10/14/17
+// Update         02/13/18
+// Wilkinson SXSW 03/09/18
+// Portal Glitch  03/17/18
 
 #include <FastLED.h>
 
-#define NUM_LEDS1  75
-#define NUM_LEDS2 118
-#define NUM_LEDS3 144
+// adjust for strand length
+#define NUM_LEDS1  137
+#define NUM_LEDS2  75
+#define NUM_LEDS3  125
 
+// depends on hardware wiring 
 #define DATA_PIN1   9
 #define DATA_PIN2  10
 #define DATA_PIN3  11
-
 #define BUTTON_PIN1 4
 #define BUTTON_PIN2 3
 #define BUTTON_PIN3 6
-#define BUTTON_NONE 0
+
+// should be outside pin range
+#define BUTTON_NONE   31
+#define BUTTON_AGAIN  63
+#define BUTTON_HELD  127
+
+#define HOLD_THRESHOLD 20 // probably should be increased (try 40?)
 
 #define BRIGHTNESS  255
 #define FRAMES_PER_SECOND 60
@@ -30,18 +38,10 @@ CRGB leds3[NUM_LEDS3];
 CRGBPalette16 gPal;  // setting here causes hang?  wtf?
 uint8_t       gHue = 00; // rotating "base color" 
 
-// replace global with return value
-// int buttonPressed = 0;
-
-//CRGBPalette16 currentPalette(ForestColors_p);
-//CRGBPalette16 targetPalette(OceanColors_p);
-
-
-///////Pulling in new color sequence from Andrew Tuline, Title: inoise8_pal_demo.ino
-
-//uint16_t scale = 30;          // Wouldn't recommend changing this on the fly, or the animation will be really blocky.
-uint8_t maxChanges = 48;      // Value for blending between palettes.
- 
+// replace global with arguments & return value, if possible
+int   gLastButton       = BUTTON_NONE;
+int   gCurrentPattern   = BUTTON_PIN1;
+int   gButtonHoldCount  = 0;
 
 /////////////////////////////////////////////////////////////////
 
@@ -63,25 +63,51 @@ void setup() {
   
   // clear and fill with something
   FastLED.clear();
-  renderEffects(BUTTON_PIN1); // pretend a button was pushed
+  renderEffects(gCurrentPattern);
   FastLED.show();
 }
 
-int gLastButton;
 /*
  * Main loop
  */
 void loop() {
   int buttonPressed = checkInputs();
-  
-  if (buttonPressed != BUTTON_NONE) {
-    gLastButton = buttonPressed;   
+
+  if (buttonPressed == BUTTON_NONE) {
+    // reset hold counter
+    gButtonHoldCount = 0;     
   }
-  renderEffects(gLastButton);
+  else if (buttonPressed == gLastButton) {
+    // multiple push, or being held?
+    if (gButtonHoldCount == 0) {
+      // already doing that?
+       if (gCurrentPattern == gLastButton) {
+        // then do the other thing!
+        gCurrentPattern =  BUTTON_AGAIN;
+      }
+      else {
+        // go back to original pattern for this button
+        gCurrentPattern = buttonPressed;
+      }
+    }
+    else {
+      // button still held, but for how long?
+      if (gButtonHoldCount >= HOLD_THRESHOLD) {
+        gCurrentPattern = BUTTON_HELD;
+      }
+    }
+    gButtonHoldCount++;
+  }
+  else {
+    // new button pushed!
+    gButtonHoldCount = 1;
+    gLastButton     = buttonPressed;   
+    gCurrentPattern = buttonPressed;
+  }
+
+  renderEffects(gCurrentPattern);
   FastLED.show();
 
-
-  
   //FastLED.delay(1000/FRAMES_PER_SECOND); 
 }
 
@@ -89,25 +115,26 @@ void loop() {
  * Check our inputs and set the button state
  */
 int checkInputs() {
- int buttonPressed = BUTTON_NONE;
- 
- if (digitalRead(BUTTON_PIN1) == HIGH) {
-    // highest priority button
-    buttonPressed = BUTTON_PIN1;
-  } 
-  else if (digitalRead(BUTTON_PIN2) == HIGH) {
+  int buttonPressed = BUTTON_NONE;
+
+  if (digitalRead(BUTTON_PIN2) == HIGH) {
+    // middle button is smallest, so highest priority
     buttonPressed = BUTTON_PIN2;
   } 
   else if (digitalRead(BUTTON_PIN3) == HIGH) {
-    // lowest priority button
+    // furthest right button is big, but on the right
     buttonPressed = BUTTON_PIN3;
   } 
+  else if (digitalRead(BUTTON_PIN1) == HIGH) {
+    // big left button hit often, so lowest priority
+    buttonPressed = BUTTON_PIN1;
+  }   
   else {
     // bail out early
     return BUTTON_NONE;
   }
 
-  Serial.println(buttonPressed);
+//  Serial.println(buttonPressed);
   return buttonPressed;
 }
 
@@ -118,24 +145,27 @@ int checkInputs() {
 void renderEffects(int buttonPressed) {
     switch (buttonPressed) {
     case BUTTON_PIN1:
-     Serial.println("Button 1 pressed.");  
       bpm(leds1, NUM_LEDS1);
       bpm(leds2, NUM_LEDS2);
       bpm(leds3, NUM_LEDS3);
       break;
     case BUTTON_PIN2:
-      Serial.println("Button 2 pressed.");  
-      juggle(leds1, NUM_LEDS1);
-      juggle(leds2, NUM_LEDS2);
-      juggle(leds3, NUM_LEDS3); 
+       juggle(leds1, NUM_LEDS1, 0, 32, 7);
+      juggle(leds2, NUM_LEDS2, 0, 32, 7);
+      juggle(leds3, NUM_LEDS3, 0, 32, 7); 
       break;
     case BUTTON_PIN3:
-      Serial.println("Button 3 pressed."); 
       rainbowWithGlitter(leds1, NUM_LEDS1); 
       rainbowWithGlitter(leds2, NUM_LEDS2);
       rainbowWithGlitter(leds3, NUM_LEDS3); 
       break;
-    case BUTTON_NONE:
+    case BUTTON_AGAIN:
+    case BUTTON_HELD:
+      juggle(leds1, NUM_LEDS1,  64, 32, 7);
+      juggle(leds2, NUM_LEDS2, 128, 32, 7);
+      juggle(leds3, NUM_LEDS3, 192, 32, 7); 
+      break;
+     case BUTTON_NONE:
       Serial.println("No button pressed.");  
       break;
   }
@@ -144,13 +174,13 @@ void renderEffects(int buttonPressed) {
 /*
  * Efect #1
  */
-void juggle(CRGB* strand, int numlights) {
+void juggle(CRGB* strand, int numLights, byte baseHue, byte hueRotation, int beatIncrement) {
   // eight colored dots, weaving in and out of sync with each other
-  fadeToBlackBy( strand, numlights, 20);
-  byte dothue = 0;
+  fadeToBlackBy( strand, numLights, 20);
+  byte dotHue = baseHue;
   for( int i = 0; i < 8; i++) {
-    strand[beatsin16(i+7,0,numlights)] |= CHSV(dothue, 200, 255);
-    dothue += 32;
+    strand[beatsin16(i+beatIncrement, 0, numLights)] |= CHSV(dotHue, 200, 255);
+    dotHue += hueRotation;
   }
 }
 
