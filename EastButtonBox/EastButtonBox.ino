@@ -150,7 +150,7 @@ void renderEffects(int buttonPressed) {
       bpm(leds3, NUM_LEDS3);
       break;
     case BUTTON_PIN2:
-       juggle(leds1, NUM_LEDS1, 0, 32, 7);
+      juggle(leds1, NUM_LEDS1, 0, 32, 7);
       juggle(leds2, NUM_LEDS2, 0, 32, 7);
       juggle(leds3, NUM_LEDS3, 0, 32, 7); 
       break;
@@ -160,7 +160,9 @@ void renderEffects(int buttonPressed) {
       rainbowWithGlitter(leds3, NUM_LEDS3); 
       break;
     case BUTTON_AGAIN:
+      // eventually make this do something unique <- TBD
     case BUTTON_HELD:
+      // experiment with hueRotation & beatIncrement <- TBD
       juggle(leds1, NUM_LEDS1,  64, 32, 7);
       juggle(leds2, NUM_LEDS2, 128, 32, 7);
       juggle(leds3, NUM_LEDS3, 192, 32, 7); 
@@ -173,9 +175,9 @@ void renderEffects(int buttonPressed) {
 
 /*
  * Efect #1
+ * eight colored dots, weaving in and out of sync with each other
  */
 void juggle(CRGB* strand, int numLights, byte baseHue, byte hueRotation, int beatIncrement) {
-  // eight colored dots, weaving in and out of sync with each other
   fadeToBlackBy( strand, numLights, 20);
   byte dotHue = baseHue;
   for( int i = 0; i < 8; i++) {
@@ -186,14 +188,14 @@ void juggle(CRGB* strand, int numLights, byte baseHue, byte hueRotation, int bea
 
 /*
  * Efect #2
+ * Colored stripes pulsing at a defined Beats-Per-Minute (BPM)
  */
-void bpm(CRGB* strand, int numlights)
-{
-  // colored stripes pulsing at a defined Beats-Per-Minute (BPM)
+void bpm(CRGB* strand, int numlights) {
   uint8_t BeatsPerMinute = 8;
   CRGBPalette16 palette = gPal;
   uint8_t beat = beatsin8( BeatsPerMinute, 64, 255);
   for( int i = 0; i < numlights; i++) { 
+    // make (i*constant) terms adjustable with parameters
     strand[i] = ColorFromPalette(palette, gHue+(i*2.60), beat-gHue+(i*3.33));
   }
 }
@@ -201,22 +203,19 @@ void bpm(CRGB* strand, int numlights)
 
 /*
  * Efect #3
+ * built-in FastLED rainbow, plus some random sparkly glitter
  */
-void rainbowWithGlitter(CRGB* leds, int NUM_LEDS) 
-{
-  // built-in FastLED rainbow, plus some random sparkly glitter
+void rainbowWithGlitter(CRGB* leds, int NUM_LEDS) {
   rainbow(leds, NUM_LEDS);
   addGlitter(leds, NUM_LEDS, 80);
 }
 
-void rainbow(CRGB* leds, int NUM_LEDS) 
-{
+void rainbow(CRGB* leds, int NUM_LEDS) {
   // FastLED's built-in rainbow generator
   fill_rainbow( leds, NUM_LEDS, gHue, 7);
 }
 
-void addGlitter(CRGB* leds, int NUM_LEDS, fract8 chanceOfGlitter) 
-{
+void addGlitter(CRGB* leds, int NUM_LEDS, fract8 chanceOfGlitter) {
   if( random8() < chanceOfGlitter) {
     leds[ random16(NUM_LEDS) ] += CRGB::White;
   }
